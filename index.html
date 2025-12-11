@@ -1,469 +1,170 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 股市儀表板 Pro 2.0</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 股市儀表板 Pro 2.1</title>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body { font-family:'Roboto',sans-serif; margin:0; padding:0; background:#121212; color:#e0e0e0; line-height:1.6; }
+header { display:flex; justify-content:space-between; align-items:center; padding:20px 40px; background:#1e1e1e; border-bottom:1px solid #333;}
+header h1 { margin:0; font-size:1.8rem;}
+header button { padding:8px 16px; font-size:1rem; background:#333; color:#e0e0e0; border:none; border-radius:4px; cursor:pointer;}
+header button:hover { background:#555;}
 
-    <style>
-        /* ------------------------
-           全域樣式
-        ------------------------ */
-        body {
-            font-family: 'Roboto', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #121212;
-            color: #e0e0e0;
-            line-height: 1.6;
-        }
+#stocks-container { display:flex; flex-direction:column; gap:20px; padding:20px 40px;}
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 40px;
-            background-color: #1e1e1e;
-            border-bottom: 1px solid #333;
-        }
+.stock-card { background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:10px 15px; max-height:60px; overflow:hidden; transition:all 0.3s ease; cursor:pointer;}
+.stock-card.expanded { max-height:2000px; padding:20px;}
 
-        header h1 {
-            margin: 0;
-            font-size: 1.8rem;
-        }
+.stock-card h2 { margin:0 0 5px 0; font-size:1.3rem; color:#00ffb0;}
+.price-info { font-size:1rem; }
+.price-info span { font-weight:bold; color:#ffeb3b; }
 
-        header button {
-            padding: 8px 16px;
-            font-size: 1rem;
-            background-color: #333;
-            color: #e0e0e0;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
+canvas.chart-k { width:100%; height:400px; margin-bottom:20px;}
+canvas.chart-rsi, canvas.chart-macd { width:100%; height:150px; margin-bottom:20px;}
 
-        header button:hover {
-            background-color: #555;
-        }
+.analysis-report { background:#2a2a2a; border-radius:6px; padding:10px 15px; font-size:0.9rem; line-height:1.4;}
 
-        /* ------------------------
-           股票卡片
-        ------------------------ */
-        #stocks-container {
-            display: flex;
-            flex-direction: column;
-            gap: 40px;
-            padding: 20px 40px;
-        }
+footer { text-align:center; padding:20px 0; background:#1e1e1e; border-top:1px solid #333; font-size:0.9rem; color:#999;}
 
-        .stock-card {
-            background-color: #1f1f1f;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 20px;
-        }
-
-        .stock-card h2 {
-            margin: 0 0 10px 0;
-            font-size: 1.5rem;
-            color: #00ffb0;
-        }
-
-        .price-info {
-            margin-bottom: 20px;
-            font-size: 1.1rem;
-        }
-
-        .price-info span {
-            font-weight: bold;
-            color: #ffeb3b;
-        }
-
-        /* ------------------------
-           圖表樣式
-        ------------------------ */
-        canvas.chart-k {
-            width: 100%;
-            height: 500px;
-            margin-bottom: 20px;
-        }
-
-        canvas.chart-rsi {
-            width: 100%;
-            height: 200px;
-            margin-bottom: 20px;
-        }
-
-        canvas.chart-macd {
-            width: 100%;
-            height: 200px;
-            margin-bottom: 20px;
-        }
-
-        /* ------------------------
-           技術分析報告
-        ------------------------ */
-        .analysis-report {
-            background-color: #2a2a2a;
-            border-radius: 6px;
-            padding: 10px 15px;
-            font-size: 0.95rem;
-            line-height: 1.4;
-        }
-
-        /* ------------------------
-           Footer
-        ------------------------ */
-        footer {
-            text-align: center;
-            padding: 20px 0;
-            background-color: #1e1e1e;
-            border-top: 1px solid #333;
-            font-size: 0.9rem;
-            color: #999;
-        }
-
-        /* ------------------------
-           主題切換（亮/深色模式）
-        ------------------------ */
-        body.light-mode {
-            background-color: #f5f5f5;
-            color: #212121;
-        }
-
-        body.light-mode header {
-            background-color: #ffffff;
-            color: #212121;
-            border-bottom: 1px solid #ccc;
-        }
-
-        body.light-mode .stock-card {
-            background-color: #ffffff;
-            border: 1px solid #ccc;
-            color: #212121;
-        }
-
-        body.light-mode .analysis-report {
-            background-color: #eeeeee;
-            color: #212121;
-        }
-
-        body.light-mode header button {
-            background-color: #ddd;
-            color: #212121;
-        }
-
-        body.light-mode header button:hover {
-            background-color: #bbb;
-        }
-    </style>
+body.light-mode { background:#f5f5f5; color:#212121;}
+body.light-mode header { background:#fff; color:#212121; border-bottom:1px solid #ccc;}
+body.light-mode .stock-card { background:#fff; border:1px solid #ccc; color:#212121;}
+body.light-mode .analysis-report { background:#eee; color:#212121;}
+body.light-mode header button { background:#ddd; color:#212121;}
+body.light-mode header button:hover { background:#bbb;}
+</style>
 </head>
 <body class="dark-mode">
-    <header>
-        <h1>📈 AI 股市儀表板 Pro 2.0</h1>
-        <button id="toggleTheme">切換亮/深色模式</button>
-    </header>
 
-    <main>
-        <div id="stocks-container">
-            <!-- 股票卡片會動態生成 -->
-        </div>
-    </main>
+<header>
+<h1>📈 AI 股市儀表板 Pro 2.1</h1>
+<button id="toggleTheme">切換亮/深色模式</button>
+</header>
 
-    <footer>
-        <p>© 2025 AI 股市儀表板 Pro 2.0</p>
-    </footer>
+<main>
+<div id="stocks-container"></div>
+</main>
 
-    <script>
-        // -------------------------------
-        // 股票清單
-        // -------------------------------
-        const stockList = ["2330.TW", "2454.TW", "0050.TW", "0056.TW", "VOO"];
+<footer>
+<p>© 2025 AI 股市儀表板 Pro 2.1</p>
+</footer>
 
-        // -------------------------------
-        // 主題切換
-        // -------------------------------
-        const toggleBtn = document.getElementById('toggleTheme');
-        toggleBtn.addEventListener('click', () => {
-            document.body.classList.toggle('light-mode');
-        });
+<script>
+const stockList = ["2330.TW","2454.TW","0050.TW","0056.TW","VOO"];
+const stocksContainer = document.getElementById('stocks-container');
 
-        // -------------------------------
-        // 技術指標計算
-        // -------------------------------
+document.getElementById('toggleTheme').addEventListener('click',()=>{document.body.classList.toggle('light-mode');});
 
-        // 計算 SMA
-        function SMA(data, period) {
-            let result = [];
-            for (let i = 0; i < data.length; i++) {
-                if (i < period - 1) {
-                    result.push(null);
-                    continue;
-                }
-                let sum = 0;
-                for (let j = i - period + 1; j <= i; j++) sum += data[j];
-                result.push(sum / period);
-            }
-            return result;
+// ------------------- 技術指標 -------------------
+function SMA(data, period){let r=[];for(let i=0;i<data.length;i++){if(i<period-1){r.push(null);continue;}let sum=0;for(let j=i-period+1;j<=i;j++) sum+=data[j];r.push(sum/period);} return r;}
+function EMA(data, period){let r=[];let k=2/(period+1);data.forEach((v,i)=>{if(i===0) r.push(v); else r.push(v*k+r[i-1]*(1-k));}); return r;}
+function RSI(data, period=14){let gains=[],losses=[];for(let i=1;i<data.length;i++){let c=data[i]-data[i-1];gains.push(c>0?c:0);losses.push(c<0?-c:0);} let avgGain=SMA(gains,period),avgLoss=SMA(losses,period);let rsi=[null];for(let i=0;i<avgGain.length;i++){if(avgGain[i]===null||avgLoss[i]===null){rsi.push(null);continue;} rsi.push(100-(100/(1+avgGain[i]/avgLoss[i])));} return rsi;}
+function MACD(data,short=12,long=26,signal=9){let emaS=EMA(data,short),emaL=EMA(data,long);let macd=emaS.map((v,i)=>v-emaL[i]);let signalLine=EMA(macd,signal);let hist=macd.map((v,i)=>v-signalLine[i]); return {macd,signalLine,hist};}
+function ATR(high,low,close,period=14){let tr=[];for(let i=0;i<close.length;i++){if(i===0) tr.push(high[i]-low[i]); else tr.push(Math.max(high[i]-low[i],Math.abs(high[i]-close[i-1]),Math.abs(low[i]-close[i-1])));} return SMA(tr,period);}
+function getSupportResistance(high,low,close){let h=Math.max(...high.slice(-20)),l=Math.min(...low.slice(-20)); return {support:l,resistance:h};}
+function calculateBuyScore(latest,ma20,ma60,ma200,rsi,macdHist,atrPercent){let score=0; if(ma20>ma60&&ma60>ma200) score+=15;if(latest>ma20) score+=5;if(macdHist>0) score+=10;if(rsi<30) score+=15;if(latest<ma200) score+=10;if(atrPercent<1.5) score+=10;if(atrPercent>3) score-=10; return Math.min(Math.max(Math.round(score),0),100);}
+
+// ------------------- 建立卡片 -------------------
+stockList.forEach(symbol=>{
+    const card=document.createElement('div'); card.className='stock-card'; card.id=`stock-${symbol}`;
+    card.innerHTML=`<h2>${symbol}</h2><div class="price-info">最新價：<span class="latest-price">--</span> | BuyScore：<span class="buy-score">--</span></div><div class="analysis-report">載入中...</div>`;
+    stocksContainer.appendChild(card);
+
+    // 點擊展開
+    card.addEventListener('click',async ()=>{
+        card.classList.toggle('expanded');
+        if(card.classList.contains('expanded') && !card.querySelector('canvas')){
+            await renderStock(symbol,card);
         }
+    });
+});
 
-        // 計算 EMA
-        function EMA(data, period) {
-            let result = [];
-            let k = 2 / (period + 1);
-            data.forEach((price, i) => {
-                if (i === 0) result.push(price);
-                else result.push(price * k + result[i-1] * (1 - k));
-            });
-            return result;
-        }
+// ------------------- 抓 Yahoo Finance (跨域代理) -------------------
+async function fetchStockData(symbol){
+    try{
+        const url=`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=6mo&interval=1d`)}`;
+        const res=await fetch(url);
+        const data=await res.json();
+        const timestamps=data.chart.result[0].timestamp;
+        const quote=data.chart.result[0].indicators.quote[0];
+        const close=quote.close, open=quote.open, high=quote.high, low=quote.low, volume=quote.volume;
+        return {timestamps,open,high,low,close,volume};
+    }catch(err){console.error(symbol,err); return null;}
+}
 
-        // 計算 RSI
-        function RSI(data, period=14) {
-            let gains = [];
-            let losses = [];
-            for (let i=1; i<data.length; i++) {
-                let change = data[i] - data[i-1];
-                gains.push(change > 0 ? change : 0);
-                losses.push(change < 0 ? -change : 0);
-            }
-            let avgGain = SMA(gains, period);
-            let avgLoss = SMA(losses, period);
-            let rsi = [null];
-            for (let i=0; i<avgGain.length; i++) {
-                if (avgGain[i] === null || avgLoss[i] === null) { rsi.push(null); continue; }
-                rsi.push(100 - (100 / (1 + avgGain[i]/avgLoss[i])));
-            }
-            return rsi;
-        }
+// ------------------- 渲染圖表與分析 -------------------
+async function renderStock(symbol,card){
+    const data=await fetchStockData(symbol); if(!data) return;
 
-        // 計算 MACD
-        function MACD(data, short=12, long=26, signal=9) {
-            let emaShort = EMA(data, short);
-            let emaLong = EMA(data, long);
-            let macd = emaShort.map((v, i) => v - emaLong[i]);
-            let signalLine = EMA(macd, signal);
-            let histogram = macd.map((v, i) => v - signalLine[i]);
-            return {macd, signalLine, histogram};
-        }
+    const latest=data.close[data.close.length-1];
+    const ma20=SMA(data.close,20).slice(-1)[0]||latest;
+    const ma60=SMA(data.close,60).slice(-1)[0]||latest;
+    const ma200=SMA(data.close,200).slice(-1)[0]||latest;
+    const rsi14=RSI(data.close,14).slice(-1)[0]||50;
+    const macdData=MACD(data.close);
+    const macdHist=macdData.hist.slice(-1)[0]||0;
+    const atrVal=ATR(data.high,data.low,data.close).slice(-1)[0]||0;
+    const atrPercent=(atrVal/latest*100).toFixed(2);
+    const supportRes=getSupportResistance(data.high,data.low,data.close);
+    const buyScore=calculateBuyScore(latest,ma20,ma60,ma200,rsi14,macdHist,atrPercent);
 
-        // ATR
-        function ATR(high, low, close, period=14) {
-            let tr = [];
-            for (let i=0; i<close.length; i++) {
-                if(i===0) tr.push(high[i]-low[i]);
-                else tr.push(Math.max(high[i]-low[i], Math.abs(high[i]-close[i-1]), Math.abs(low[i]-close[i-1])));
-            }
-            return SMA(tr, period);
-        }
+    card.querySelector('.latest-price').textContent=latest.toFixed(2);
+    card.querySelector('.buy-score').textContent=buyScore;
 
-        // -------------------------------
-        // 支撐 / 壓力
-        // -------------------------------
-        function getSupportResistance(high, low, close) {
-            // 簡單方法: 取最近 20 日最高、最低
-            let recentHigh = Math.max(...high.slice(-20));
-            let recentLow = Math.min(...low.slice(-20));
-            return {support: recentLow, resistance: recentHigh};
-        }
+    // 插入圖表 canvas
+    const kCanvas=document.createElement('canvas'); kCanvas.className='chart-k';
+    const rsiCanvas=document.createElement('canvas'); rsiCanvas.className='chart-rsi';
+    const macdCanvas=document.createElement('canvas'); macdCanvas.className='chart-macd';
+    card.append(kCanvas,rsiCanvas,macdCanvas);
 
-        // -------------------------------
-        // AI BuyScore 計算
-        // -------------------------------
-        function calculateBuyScore(latest, ma20, ma60, ma200, rsi, macdHist, atrPercent) {
-            let score = 0;
-            // Momentum
-            if(ma20 > ma60 && ma60 > ma200) score += 15;
-            if(latest > ma20) score +=5;
-            if(macdHist > 0) score += 10;
+    const trend=(ma20>ma60&&ma60>ma200)?"🟢 強多":(ma20<ma60&&ma60<ma200)?"🔴 強空":"🟡 中性";
+    card.querySelector('.analysis-report').innerHTML=`
+        <p>趨勢判斷：${trend}</p>
+        <p>RSI：${rsi14.toFixed(2)}</p>
+        <p>MA20：${ma20.toFixed(2)}, MA60：${ma60.toFixed(2)}, MA200：${ma200.toFixed(2)}</p>
+        <p>ATR%：${atrPercent}%</p>
+        <p>支撐：${supportRes.support.toFixed(2)}, 壓力：${supportRes.resistance.toFixed(2)}</p>
+    `;
 
-            // Value
-            if(rsi < 30) score +=15;
-            if(latest < ma200) score +=10;
+    // K 線
+    new Chart(kCanvas,{
+        type:'candlestick',
+        data:{
+            labels:data.timestamps.map(t=>new Date(t*1000).toLocaleDateString()),
+            datasets:[{label:symbol,data:data.close.map((c,i)=>({o:data.open[i],h:data.high[i],l:data.low[i],c:data.close[i]})),borderColor:'#00ffb0'}]
+        },
+        options:{plugins:{legend:{display:false}}}
+    });
 
-            // Risk
-            if(atrPercent < 1.5) score +=10;
-            if(atrPercent > 3) score -=10;
+    // RSI
+    new Chart(rsiCanvas,{
+        type:'line',
+        data:{labels:data.timestamps.map(t=>new Date(t*1000).toLocaleDateString()),datasets:[{label:'RSI14',data:RSI(data.close,14),borderColor:'#ffeb3b',fill:false,tension:0.1}]},
+        options:{plugins:{legend:{display:true}}}
+    });
 
-            return Math.min(Math.max(Math.round(score),0),100);
-        }
+    // MACD
+    const macd=MACD(data.close);
+    new Chart(macdCanvas,{
+        type:'bar',
+        data:{
+            labels:data.timestamps.map(t=>new Date(t*1000).toLocaleDateString()),
+            datasets:[
+                {type:'line',label:'MACD',data:macd.macd,borderColor:'#00ffff',fill:false},
+                {type:'line',label:'Signal',data:macd.signalLine,borderColor:'#ff00ff',fill:false},
+                {type:'bar',label:'Histogram',data:macd.hist,backgroundColor:'#8888ff'}
+            ]
+        },
+        options:{plugins:{legend:{display:true}}}
+    });
+}
+</script>
 
-        // -------------------------------
-        // 渲染股票卡片
-        // -------------------------------
-        const stocksContainer = document.getElementById('stocks-container');
-
-        stockList.forEach(symbol => {
-            const card = document.createElement('div');
-            card.className = 'stock-card';
-            card.id = `stock-${symbol}`;
-
-            card.innerHTML = `
-                <h2>${symbol}</h2>
-                <div class="price-info">
-                    最新價：<span class="latest-price">--</span> | 
-                    BuyScore：<span class="buy-score">--</span>
-                </div>
-                <canvas class="chart-k"></canvas>
-                <canvas class="chart-rsi"></canvas>
-                <canvas class="chart-macd"></canvas>
-                <div class="analysis-report">載入中...</div>
-            `;
-            stocksContainer.appendChild(card);
-        });
-
-        // -------------------------------
-        // 取得 Yahoo Finance 資料
-        // -------------------------------
-        async function fetchStockData(symbol) {
-            try {
-                const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=6mo&interval=1d`;
-                const res = await fetch(url);
-                const data = await res.json();
-                const timestamps = data.chart.result[0].timestamp;
-                const quote = data.chart.result[0].indicators.quote[0];
-                const close = quote.close;
-                const open = quote.open;
-                const high = quote.high;
-                const low = quote.low;
-                const volume = quote.volume;
-                return {timestamps, open, high, low, close, volume};
-            } catch(err) {
-                console.error(symbol, err);
-                return null;
-            }
-        }
-
-        // -------------------------------
-        // 渲染圖表與分析
-        // -------------------------------
-        async function renderStock(symbol) {
-            const data = await fetchStockData(symbol);
-            if(!data) return;
-
-            const card = document.getElementById(`stock-${symbol}`);
-            const latest = data.close[data.close.length-1];
-            const ma20 = SMA(data.close,20).slice(-1)[0] || latest;
-            const ma60 = SMA(data.close,60).slice(-1)[0] || latest;
-            const ma200 = SMA(data.close,200).slice(-1)[0] || latest;
-            const rsi14 = RSI(data.close,14).slice(-1)[0] || 50;
-            const macdData = MACD(data.close);
-            const macdHist = macdData.histogram.slice(-1)[0] || 0;
-            const atrVal = ATR(data.high, data.low, data.close).slice(-1)[0] || 0;
-            const atrPercent = (atrVal / latest * 100).toFixed(2);
-
-            const supportRes = getSupportResistance(data.high, data.low, data.close);
-            const buyScore = calculateBuyScore(latest, ma20, ma60, ma200, rsi14, macdHist, atrPercent);
-
-            // 更新價格與 BuyScore
-            card.querySelector('.latest-price').textContent = latest.toFixed(2);
-            card.querySelector('.buy-score').textContent = buyScore;
-
-            // 更新分析報告
-            const trend = (ma20 > ma60 && ma60 > ma200) ? "🟢 強多" : (ma20 < ma60 && ma60 < ma200) ? "🔴 強空" : "🟡 中性";
-            card.querySelector('.analysis-report').innerHTML = `
-                <p>趨勢判斷：${trend}</p>
-                <p>RSI：${rsi14.toFixed(2)}</p>
-                <p>MA20：${ma20.toFixed(2)}, MA60：${ma60.toFixed(2)}, MA200：${ma200.toFixed(2)}</p>
-                <p>ATR%：${atrPercent}%</p>
-                <p>支撐：${supportRes.support.toFixed(2)}, 壓力：${supportRes.resistance.toFixed(2)}</p>
-            `;
-
-            // -------------------------------
-            // 畫圖表
-            // -------------------------------
-            // K 線
-            new Chart(card.querySelector('.chart-k'), {
-                type: 'candlestick',
-                data: {
-                    labels: data.timestamps.map(t => new Date(t*1000).toLocaleDateString()),
-                    datasets: [{
-                        label: symbol,
-                        data: data.close.map((c,i)=>({
-                            o: data.open[i],
-                            h: data.high[i],
-                            l: data.low[i],
-                            c: data.close[i]
-                        })),
-                        borderColor: '#00ffb0'
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } }
-                }
-            });
-
-            // RSI
-            new Chart(card.querySelector('.chart-rsi'), {
-                type: 'line',
-                data: {
-                    labels: data.timestamps.map(t => new Date(t*1000).toLocaleDateString()),
-                    datasets: [{
-                        label: 'RSI14',
-                        data: RSI(data.close,14),
-                        borderColor: '#ffeb3b',
-                        fill: false,
-                        tension: 0.1
-                    }]
-                },
-                options: { plugins: { legend: { display: true } } }
-            });
-
-            // MACD
-            const macd = MACD(data.close);
-            new Chart(card.querySelector('.chart-macd'), {
-                type: 'bar',
-                data: {
-                    labels: data.timestamps.map(t => new Date(t*1000).toLocaleDateString()),
-                    datasets: [
-                        {
-                            type: 'line',
-                            label: 'MACD',
-                            data: macd.macd,
-                            borderColor: '#00ffff',
-                            fill: false
-                        },
-                        {
-                            type: 'line',
-                            label: 'Signal',
-                            data: macd.signalLine,
-                            borderColor: '#ff00ff',
-                            fill: false
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Histogram',
-                            data: macd.histogram,
-                            backgroundColor: '#8888ff'
-                        }
-                    ]
-                },
-                options: { plugins: { legend: { display: true } } }
-            });
-        }
-
-        // -------------------------------
-        // 初始化
-        // -------------------------------
-        async function init() {
-            for(const symbol of stockList){
-                await renderStock(symbol);
-            }
-        }
-
-        init();
-
-        // -------------------------------
-        // 每 30 秒更新
-        // -------------------------------
-        setInterval(init, 30000);
-    </script>
 </body>
 </html>
