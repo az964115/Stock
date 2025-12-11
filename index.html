@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 股市儀表板 Pro 2.5</title>
+<title>AI 股市專業儀表板</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -13,15 +13,14 @@ header { display:flex; justify-content:space-between; align-items:center; paddin
 header h1 { margin:0; font-size:1.8rem;}
 header button { padding:8px 16px; font-size:1rem; background:#333; color:#e0e0e0; border:none; border-radius:4px; cursor:pointer;}
 header button:hover { background:#555;}
-#stocks-container { display:flex; flex-direction:column; gap:15px; padding:20px 40px;}
-.stock-card { background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:12px; display:flex; align-items:center; gap:15px; cursor:pointer; transition:all 0.3s ease; max-height:90px; overflow:hidden;}
-.stock-card.expanded { flex-direction:column; max-height:3000px; padding:20px;}
-.stock-info { flex:1; display:flex; flex-direction:column; gap:4px;}
-.stock-info h2 { margin:0; font-size:1.2rem; color:#00ffb0;}
-.price-info { font-size:1rem; display:flex; gap:10px; align-items:center;}
+#stocks-container { display:flex; flex-wrap:wrap; gap:15px; padding:20px 40px;}
+.stock-card { background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:12px; flex:1 1 200px; cursor:pointer; transition:all 0.3s ease; display:flex; flex-direction:column; max-height:150px; overflow:hidden;}
+.stock-card.expanded { max-height:1000px; padding:20px;}
+.stock-header { display:flex; justify-content:space-between; align-items:center;}
+.stock-header h2 { margin:0; font-size:1.2rem; color:#00ffb0;}
+.price-info { font-size:1rem; display:flex; gap:10px; align-items:center; margin-top:4px;}
 .buy-score { padding:2px 6px; border-radius:4px; color:#000;}
-canvas.k-mini { width:120px; height:50px;}
-canvas.chart-full, canvas.chart-buyscore { width:100%; height:300px; margin-top:10px;}
+canvas { width:100% !important; height:250px !important; margin-top:10px; }
 .analysis-report { margin-top:10px; background:#2a2a2a; border-radius:6px; padding:10px; font-size:0.9rem; line-height:1.4;}
 footer { text-align:center; padding:20px 0; background:#1e1e1e; border-top:1px solid #333; font-size:0.9rem; color:#999;}
 body.light-mode { background:#f5f5f5; color:#212121;}
@@ -34,44 +33,43 @@ body.light-mode header button:hover { background:#bbb;}
 </head>
 <body>
 <header>
-<h1>📈 AI 股市儀表板 Pro 2.5</h1>
+<h1>📊 AI 股市專業儀表板</h1>
 <button id="toggleTheme">切換亮/深色模式</button>
 </header>
 <main>
 <div id="stocks-container"></div>
 </main>
 <footer>
-<p>© 2025 AI 股市儀表板 Pro 2.5</p>
+<p>© 2025 AI 股市儀表板</p>
 </footer>
 
 <script>
+// ------------------- 股票列表 -------------------
 const stockList=["2330.TW","2454.TW","0050.TW","0056.TW","VOO"];
 const stocksContainer=document.getElementById('stocks-container');
 document.getElementById('toggleTheme').addEventListener('click',()=>{document.body.classList.toggle('light-mode');});
+const cardData={};
 
 // ------------------- 技術指標 -------------------
 function SMA(data, period){let r=[];for(let i=0;i<data.length;i++){if(i<period-1){r.push(null);continue;}let sum=0;for(let j=i-period+1;j<=i;j++) sum+=data[j];r.push(sum/period);} return r;}
-function EMA(data, period){let r=[];let k=2/(period+1);data.forEach((v,i)=>{if(i===0) r.push(v); else r.push(v*k+r[i-1]*(1-k));}); return r;}
-function RSI(data, period=14){let gains=[],losses=[];for(let i=1;i<data.length;i++){let c=data[i]-data[i-1];gains.push(c>0?c:0);losses.push(c<0?-c:0);} let rsi=[50]; for(let i=period;i<data.length;i++){let g=gains.slice(i-period+1,i+1).reduce((a,b)=>a+b,0)/period; let l=losses.slice(i-period+1,i+1).reduce((a,b)=>a+b,0)/period; rsi.push(100-(100/(1+g/l)));} return rsi;}
-function calculateBuyScore(latest,ma20,ma60,ma200,rsi){let score=0;if(ma20>ma60&&ma60>ma200) score+=15;if(latest>ma20) score+=5;if(rsi<30) score+=15;if(latest<ma200) score+=10; return Math.min(Math.max(Math.round(score),0),100);}
-function getSupportResistance(high,low){let h=Math.max(...high.slice(-20)),l=Math.min(...low.slice(-20)); return {support:l,resistance:h};}
+function RSI(data, period=14){let rsi=[];for(let i=0;i<data.length;i++){if(i<period){rsi.push(null); continue;} let gains=0, losses=0; for(let j=i-period+1;j<=i;j++){let diff=data[j]-data[j-1];if(diff>0) gains+=diff; else losses+=-diff;} let r=100-(100/(1+(gains/period)/(losses/period))); rsi.push(r);} return rsi;}
+function calculateBuyScore(latest, ma20, ma60, ma200, rsi){let score=0;if(ma20>ma60&&ma60>ma200) score+=15;if(latest>ma20) score+=5;if(rsi<30) score+=15;if(latest<ma200) score+=10; return Math.min(Math.max(Math.round(score),0),100);}
+function getSupportResistance(high, low){return {support:Math.min(...low.slice(-20)), resistance:Math.max(...high.slice(-20))};}
 
 // ------------------- 建立卡片 -------------------
-const cardData={};
 stockList.forEach(symbol=>{
     const card=document.createElement('div'); card.className='stock-card'; card.id=`stock-${symbol}`;
-    card.innerHTML=`<div class="stock-info">
+    card.innerHTML=`<div class="stock-header">
         <h2>${symbol}</h2>
         <div class="price-info">最新價：<span class="latest-price">--</span> | BuyScore：<span class="buy-score">--</span></div>
-        <div class="analysis-report">載入中...</div>
     </div>
-    <canvas class="k-mini"></canvas>
+    <canvas class="chart-mini"></canvas>
+    <div class="analysis-report">載入中...</div>
     <canvas class="chart-full"></canvas>
     <canvas class="chart-buyscore"></canvas>`;
     stocksContainer.appendChild(card);
-
-    card.addEventListener('click',()=>{card.classList.toggle('expanded');});
-    cardData[symbol]={card, buyHistory:[]};
+    card.addEventListener('click',()=>{card.classList.toggle('expanded'); if(!cardData[symbol].loaded){loadFullData(symbol);}});
+    cardData[symbol]={card, buyHistory:[], loaded:false};
 });
 
 // ------------------- 抓 Yahoo Finance -------------------
@@ -80,18 +78,43 @@ async function fetchStockData(symbol, range='6mo', interval='1d'){
         const url=`https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=${interval}`)}`;
         const res=await fetch(url);
         const data=await res.json();
-        const timestamps=data.chart.result[0].timestamp;
         const quote=data.chart.result[0].indicators.quote[0];
-        return {timestamps,open:quote.open,high:quote.high,low:quote.low,close:quote.close};
+        return {
+            timestamps:data.chart.result[0].timestamp,
+            open:quote.open,
+            high:quote.high,
+            low:quote.low,
+            close:quote.close
+        };
     }catch(err){console.error(symbol,err); return null;}
 }
 
-// ------------------- 渲染資料 -------------------
-async function renderStock(symbol){
-    const {card,buyHistory}=cardData[symbol];
+// ------------------- 渲染小卡 -------------------
+async function renderMiniCard(symbol){
+    const {card, buyHistory}=cardData[symbol];
     const miniData=await fetchStockData(symbol,'1mo','1d');
+    if(!miniData) return;
+
+    const latest=miniData.close[miniData.close.length-1];
+    const buyScore=50; // 初始暫時50，完整公式等展開後計算
+    card.querySelector('.latest-price').textContent=latest.toFixed(2);
+    card.querySelector('.buy-score').textContent=buyScore;
+    card.querySelector('.buy-score').style.backgroundColor='#ffeb3b';
+
+    new Chart(card.querySelector('.chart-mini'),{
+        type:'line',
+        data:{labels:miniData.timestamps.map(t=>new Date(t*1000).toLocaleDateString()), datasets:[{label:'收盤',data:miniData.close,borderColor:'#00ffb0',fill:false,tension:0.2}]},
+        options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}
+    });
+}
+stockList.forEach(renderMiniCard);
+
+// ------------------- 點擊展開後載入完整數據 -------------------
+async function loadFullData(symbol){
+    const {card, buyHistory}=cardData[symbol];
+    cardData[symbol].loaded=true;
     const fullData=await fetchStockData(symbol,'6mo','1d');
-    if(!miniData || !fullData) return;
+    if(!fullData) return;
 
     const latest=fullData.close[fullData.close.length-1];
     const ma20=SMA(fullData.close,20).slice(-1)[0]||latest;
@@ -100,61 +123,54 @@ async function renderStock(symbol){
     const rsiVal=RSI(fullData.close,14).slice(-1)[0]||50;
     const buyScore=calculateBuyScore(latest,ma20,ma60,ma200,rsiVal);
 
-    // 更新文字與 BuyScore顏色
-    const buySpan=card.querySelector('.buy-score');
     card.querySelector('.latest-price').textContent=latest.toFixed(2);
+    const buySpan=card.querySelector('.buy-score');
     buySpan.textContent=buyScore;
-    if(buyScore>=70) buySpan.style.backgroundColor="#00ff00";
-    else if(buyScore>=40) buySpan.style.backgroundColor="#ffeb3b";
-    else buySpan.style.backgroundColor="#ff3b3b";
+    buySpan.style.backgroundColor=buyScore>=70?'#00ff00':buyScore>=40?'#ffeb3b':'#ff3b3b';
 
-    // 更新 BuyScore 歷史
-    buyHistory.push({time:new Date(),score:buyScore});
-    if(buyHistory.length>50) buyHistory.shift(); // 限制歷史數量
+    buyHistory.push({time:new Date(), score:buyScore});
 
-    // 小卡折線圖
-    const kMiniCanvas=card.querySelector('canvas.k-mini');
-    new Chart(kMiniCanvas,{
-        type:'line',
-        data:{labels:miniData.timestamps.map(t=>new Date(t*1000).toLocaleDateString()),
-              datasets:[{label:'收盤',data:miniData.close,borderColor:'#00ffb0',fill:false,tension:0.2}]},
-        options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}
-    });
-
-    // 展開完整 K 線圖
-    const fullCanvas=card.querySelector('canvas.chart-full');
-    new Chart(fullCanvas,{
-        type:'candlestick',
-        data:{labels:fullData.timestamps.map(t=>new Date(t*1000).toLocaleDateString()),
-              datasets:[{label:symbol,data:fullData.close.map((c,i)=>({o:fullData.open[i],h:fullData.high[i],l:fullData.low[i],c:c}))}]},
-        options:{plugins:{legend:{display:true}}}
-    });
-
-    // BuyScore 趨勢圖
-    const buyCanvas=card.querySelector('canvas.chart-buyscore');
-    new Chart(buyCanvas,{
-        type:'line',
-        data:{
-            labels:buyHistory.map(b=>b.time.toLocaleTimeString()),
-            datasets:[{label:'BuyScore',data:buyHistory.map(b=>b.score),borderColor:'#ffeb3b',fill:false,tension:0.2}]
-        },
-        options:{plugins:{legend:{display:true}},scales:{y:{min:0,max:100}}}
-    });
-
-    // 詳細分析
-    const supportRes=getSupportResistance(fullData.high,fullData.low);
+    const supportRes=getSupportResistance(fullData.high, fullData.low);
     card.querySelector('.analysis-report').innerHTML=`
-        <p>趨勢判斷：${ma20>ma60&&ma60>ma200?"🟢 強多":ma20<ma60&&ma60<ma200?"🔴 強空":"🟡 中性"}</p>
+        <p>趨勢：${ma20>ma60&&ma60>ma200?'🟢 強多':ma20<ma60&&ma60<ma200?'🔴 強空':'🟡 中性'}</p>
         <p>RSI：${rsiVal.toFixed(2)}</p>
         <p>MA20：${ma20.toFixed(2)}, MA60：${ma60.toFixed(2)}, MA200：${ma200.toFixed(2)}</p>
         <p>支撐：${supportRes.support.toFixed(2)}, 壓力：${supportRes.resistance.toFixed(2)}</p>`;
+
+    new Chart(card.querySelector('.chart-full'),{
+        type:'candlestick',
+        data:{labels:fullData.timestamps.map(t=>new Date(t*1000).toLocaleDateString()), datasets:[{label:symbol, data:fullData.close.map((c,i)=>({o:fullData.open[i],h:fullData.high[i],l:fullData.low[i],c:c}))}]},
+        options:{plugins:{legend:{display:true}}}
+    });
+
+    new Chart(card.querySelector('.chart-buyscore'),{
+        type:'line',
+        data:{labels:buyHistory.map(b=>b.time.toLocaleTimeString()), datasets:[{label:'BuyScore', data:buyHistory.map(b=>b.score), borderColor:'#ffeb3b', fill:false, tension:0.2}]},
+        options:{scales:{y:{min:0,max:100}}}
+    });
 }
 
-// ------------------- 初始渲染 -------------------
-stockList.forEach(renderStock);
-
-// ------------------- 每 5 秒刷新 -------------------
-setInterval(()=>{stockList.forEach(renderStock);},5000);
+// ------------------- 自動刷新最新價格 -------------------
+setInterval(()=>{
+    stockList.forEach(async(symbol)=>{
+        const {card, buyHistory, loaded}=cardData[symbol];
+        const data=await fetchStockData(symbol,'1d','1d'); // 最新一天
+        if(!data) return;
+        const latest=data.close[data.close.length-1];
+        card.querySelector('.latest-price').textContent=latest.toFixed(2);
+        if(loaded){
+            const ma20=SMA(data.close,20).slice(-1)[0]||latest;
+            const ma60=SMA(data.close,60).slice(-1)[0]||latest;
+            const ma200=SMA(data.close,200).slice(-1)[0]||latest;
+            const rsiVal=RSI(data.close,14).slice(-1)[0]||50;
+            const buyScore=calculateBuyScore(latest,ma20,ma60,ma200,rsiVal);
+            const buySpan=card.querySelector('.buy-score');
+            buySpan.textContent=buyScore;
+            buySpan.style.backgroundColor=buyScore>=70?'#00ff00':buyScore>=40?'#ffeb3b':'#ff3b3b';
+            buyHistory.push({time:new Date(), score:buyScore});
+        }
+    });
+},5000);
 </script>
 </body>
 </html>
