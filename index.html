@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 股市專業儀表板 v6</title>
+<title>AI 股市專業儀表板 v7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -13,7 +13,8 @@ header h1 { margin:0; font-size:1.8rem;}
 header button { padding:8px 16px; font-size:1rem; background:#333; color:#e0e0e0; border:none; border-radius:4px; cursor:pointer;}
 header button:hover { background:#555;}
 #stocks-container { display:flex; flex-wrap:wrap; gap:15px; padding:20px 40px;}
-.stock-card { background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:12px; flex:1 1 300px; display:flex; flex-direction:column; max-height:1000px; overflow:hidden;}
+.stock-card { background:#1f1f1f; border:1px solid #333; border-radius:8px; padding:12px; flex:1 1 300px; display:flex; flex-direction:column; max-height:1000px; overflow:hidden; transition:0.3s;}
+.stock-card.expanded { max-height:1000px;}
 .stock-header { display:flex; justify-content:space-between; align-items:center;}
 .stock-header h2 { margin:0; font-size:1.2rem; color:#00ffb0;}
 .price-info { font-size:1rem; display:flex; gap:10px; align-items:center; margin-top:4px;}
@@ -40,7 +41,7 @@ body.light-mode header button:hover { background:#bbb;}
 </head>
 <body>
 <header>
-<h1>📊 AI 股市專業儀表板 v6</h1>
+<h1>📊 AI 股市專業儀表板 v7</h1>
 <button id="toggleTheme">切換亮/深色模式</button>
 </header>
 <main class="dashboard">
@@ -135,9 +136,13 @@ async function renderStock(symbol){
 
     const buyScore=calculateBuyScore(latest,ma20,ma60,ma200,rsiVal,atrVal,volRatio);
     card.querySelector('.latest-price').textContent=latest.toFixed(2);
+
+    // ------------------- BuyScore 顏色燈號 + 高亮 -------------------
     const buySpan=card.querySelector('.buy-score');
     buySpan.textContent=buyScore;
-    buySpan.style.backgroundColor=buyScore>=70?'#00ff00':buyScore>=40?'#ffeb3b':'#ff3b3b';
+    if(buyScore>=70){ buySpan.style.backgroundColor='#00ff00'; card.style.borderColor='#00ff00'; }
+    else if(buyScore>=40){ buySpan.style.backgroundColor='#ffeb3b'; card.style.borderColor='#333'; }
+    else{ buySpan.style.backgroundColor='#ff3b3b'; card.style.borderColor='#333'; }
 
     buyHistory.push(buyScore); if(buyHistory.length>50) buyHistory.shift();
     priceHistory.push(latest); if(priceHistory.length>50) priceHistory.shift();
@@ -150,6 +155,14 @@ async function renderStock(symbol){
     else if(buyScore>=40) suggestion='中性，暫不建議加碼';
     else suggestion='弱勢，建議等待支撐區';
 
+    // ------------------- 支撐區提示 -------------------
+    if(latest <= supportRes.support*1.02){
+        card.style.backgroundColor='#004d0040'; 
+        suggestion += ' ⚡ 價格接近支撐區，可注意進場';
+    } else {
+        card.style.backgroundColor='#1f1f1f';
+    }
+
     card.querySelector('.analysis-report').innerHTML=`
         <p>趨勢：${ma20>ma60&&ma60>ma200?'🟢 強多':ma20<ma60&&ma60<ma200?'🔴 強空':'🟡 中性'}</p>
         <p>RSI：${rsiVal.toFixed(2)}</p>
@@ -160,11 +173,13 @@ async function renderStock(symbol){
         <p>成交量比值：${volRatio}</p>
         <p>AI 建議：${suggestion}</p>`;
 
-    // ------------------- 畫折線圖 -------------------
+    // ------------------- 畫折線圖 + BuyScore 顏色 -------------------
+    const colors = buyHistory.map(score=>score>=70?'#00ff00':score>=40?'#ffeb3b':'#ff3b3b');
     if(cardData[symbol].chart){
         cardData[symbol].chart.data.labels = buyHistory.map((_,i)=>i+1);
         cardData[symbol].chart.data.datasets[0].data = priceHistory;
         cardData[symbol].chart.data.datasets[1].data = buyHistory;
+        cardData[symbol].chart.data.datasets[1].borderColor = colors;
         cardData[symbol].chart.update();
     } else {
         const ctx = card.querySelector('canvas').getContext('2d');
@@ -174,7 +189,7 @@ async function renderStock(symbol){
                 labels: buyHistory.map((_,i)=>i+1),
                 datasets:[
                     {label:'價格', data:priceHistory, borderColor:'#00bfff', backgroundColor:'rgba(0,191,255,0.2)', yAxisID:'y'},
-                    {label:'BuyScore', data:buyHistory, borderColor:'#00ff00', backgroundColor:'rgba(0,255,0,0.2)', yAxisID:'y1'}
+                    {label:'BuyScore', data:buyHistory, borderColor:colors, backgroundColor:'rgba(0,255,0,0.2)', yAxisID:'y1', segment:{borderColor:ctx=>colors[ctx.p0DataIndex]}}
                 ]
             },
             options:{
